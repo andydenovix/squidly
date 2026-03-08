@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Squidly Assistant</title>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <style>
+    :root {
+      --ocean: #1a6b8a; --wave: #2d9cbe; --foam: #e0f4fb;
+      --deep: #0d3d52;  --ink: #0f2a38;  --kelp: #3dd9a4;
+    }
+    * { box-sizing: border-box; }
+    body { font-family:'DM Sans',sans-serif; background:var(--ink); min-height:100vh; overflow-x:hidden; color:white; }
+    h1,h2,h3 { font-family:'Nunito',sans-serif; }
+
+    .ocean-bg {
+      position:fixed; inset:0; z-index:0;
+      background:linear-gradient(180deg,#062030 0%,#0d3d52 35%,#1a6b8a 70%,#2d9cbe 100%);
+    }
+    .ocean-bg::after {
+      content:''; position:absolute; inset:0;
+      background:radial-gradient(ellipse at 30% 20%,rgba(45,156,190,.25) 0%,transparent 60%),
+                 radial-gradient(ellipse at 80% 80%,rgba(61,217,164,.1) 0%,transparent 50%);
+    }
+    .stars { position:absolute; inset:0; overflow:hidden; }
+    .star  { position:absolute; border-radius:50%; background:white; animation:twinkle linear infinite; }
+    @keyframes twinkle { 0%,100%{opacity:.1;transform:scale(1)} 50%{opacity:.9;transform:scale(1.3)} }
+
+    .bubble-wrap { position:fixed; inset:0; pointer-events:none; z-index:1; }
+    .bub {
+      position:absolute; border-radius:50%; bottom:-60px;
+      background:radial-gradient(circle at 35% 35%,rgba(255,255,255,.45),rgba(255,255,255,.05));
+      border:1px solid rgba(255,255,255,.2);
+      animation:bubbleRise linear infinite;
+    }
+    @keyframes bubbleRise {
+      0%{transform:translateY(0);opacity:0} 10%{opacity:1} 90%{opacity:.6} 100%{transform:translateY(-105vh);opacity:0}
+    }
+
+    @keyframes squidFloat { 0%,100%{transform:translateY(0) rotate(0deg)} 50%{transform:translateY(-16px) rotate(1.5deg)} }
+    @keyframes eyeBlink   { 0%,85%,100%{transform:scaleY(1)} 90%{transform:scaleY(.06)} }
+    @keyframes tentWiggle { 0%,100%{transform:scaleY(1) rotate(0deg)} 50%{transform:scaleY(.92) rotate(1.2deg)} }
+    @keyframes squidPop   {
+      0%{transform:scale(1) translateY(0)} 25%{transform:scale(1.12,.9) translateY(4px)}
+      55%{transform:scale(.94,1.08) translateY(-20px)} 75%{transform:scale(1.05,.97) translateY(5px)} 100%{transform:scale(1) translateY(0)}
+    }
+    @keyframes squidThink { 0%,100%{transform:translateY(0) rotate(0deg)} 25%{transform:translateY(-6px) rotate(-3deg)} 75%{transform:translateY(-6px) rotate(3deg)} }
+
+    .squid-float           { animation:squidFloat 5.5s ease-in-out infinite; filter:drop-shadow(0 18px 28px rgba(0,0,0,.45)); }
+    .squid-float.thinking  { animation:squidThink 1s ease-in-out infinite; }
+    .squid-float.popping   { animation:squidPop .55s cubic-bezier(.36,.07,.19,.97) forwards !important; }
+    .squid-eye             { animation:eyeBlink 5s ease-in-out infinite; transform-origin:center; }
+    .squid-eye:nth-child(2){ animation-delay:.15s; }
+    .tent                  { transform-origin:50% 0; animation:tentWiggle 2.6s ease-in-out infinite; }
+    .tent:nth-child(2){animation-delay:.12s} .tent:nth-child(3){animation-delay:.24s}
+    .tent:nth-child(4){animation-delay:.36s} .tent:nth-child(5){animation-delay:.48s}
+
+    .chat-bubble {
+      background:rgba(255,255,255,.95); backdrop-filter:blur(12px);
+      border-radius:20px; border-top-left-radius:4px;
+      box-shadow:0 16px 48px rgba(0,0,0,.35),0 2px 8px rgba(0,0,0,.2);
+      color:var(--ink); position:relative; transition:opacity .2s;
+    }
+    .chat-bubble::before {
+      content:''; position:absolute; left:-12px; top:0;
+      width:24px; height:24px; background:rgba(255,255,255,.95);
+      clip-path:polygon(100% 0,0 0,100% 100%);
+    }
+    .md p{margin-bottom:.5em} .md p:last-child{margin-bottom:0}
+    .md strong{font-weight:700;color:var(--ocean)}
+    .md ul,.md ol{margin:.4em 0 .4em 1.3em} .md li{margin-bottom:.2em}
+    .md code{background:var(--foam);color:var(--deep);padding:.1em .35em;border-radius:4px;font-size:.85em;font-family:monospace}
+    .md pre{background:var(--foam);border-radius:8px;padding:.7em 1em;overflow-x:auto;margin:.5em 0}
+    .md pre code{background:transparent;padding:0}
+    .md a{color:var(--wave);text-decoration:underline}
+
+    .input-wrap {
+      background:rgba(255,255,255,.1); backdrop-filter:blur(16px);
+      border:1.5px solid rgba(255,255,255,.2); border-radius:2rem;
+      transition:border-color .2s,background .2s;
+    }
+    .input-wrap:focus-within { border-color:var(--kelp); background:rgba(255,255,255,.15); }
+    .input-wrap input { background:transparent; color:white; font-family:'DM Sans',sans-serif; font-size:.95rem; }
+    .input-wrap input::placeholder { color:rgba(255,255,255,.45); }
+    .input-wrap input:focus { outline:none; }
+
+    .send-btn {
+      background:linear-gradient(135deg,var(--kelp),#2bb88a); border-radius:1.5rem;
+      font-family:'Nunito',sans-serif; font-weight:800;
+      transition:transform .15s,box-shadow .15s; box-shadow:0 4px 14px rgba(61,217,164,.4);
+    }
+    .send-btn:hover  { transform:scale(1.06); box-shadow:0 6px 20px rgba(61,217,164,.55); }
+    .send-btn:active { transform:scale(.95); }
+    .send-btn:disabled { opacity:.5; pointer-events:none; }
+
+    @keyframes dotPop { 0%,80%,100%{transform:translateY(0);opacity:.4} 40%{transform:translateY(-7px);opacity:1} }
+    .dot { width:8px;height:8px;border-radius:50%;background:var(--kelp);animation:dotPop 1.1s ease-in-out infinite;display:inline-block; }
+    .dot:nth-child(2){animation-delay:.16s} .dot:nth-child(3){animation-delay:.32s}
+
+    @keyframes fadeUp { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
+    .fu  { animation:fadeUp .5s cubic-bezier(.22,1,.36,1) both; }
+    .fu2 { animation:fadeUp .5s .1s cubic-bezier(.22,1,.36,1) both; }
+    .fu3 { animation:fadeUp .5s .2s cubic-bezier(.22,1,.36,1) both; }
+
+    ::-webkit-scrollbar{width:5px} ::-webkit-scrollbar-track{background:transparent}
+    ::-webkit-scrollbar-thumb{background:rgba(255,255,255,.2);border-radius:10px}
+  </style>
+</head>
+<body>
+
+<div class="ocean-bg"><div class="stars" id="stars"></div></div>
+<div class="bubble-wrap" id="bubbleWrap"></div>
+
+<div class="relative z-10 min-h-screen flex flex-col items-center justify-center p-4 py-10">
+  <div class="w-full max-w-lg flex flex-col items-center gap-6">
+
+    <!-- Header -->
+    <div class="text-center fu">
+      <div class="text-xs font-bold tracking-widest uppercase text-white/30 mb-1" style="font-family:Nunito">Powered by Claude</div>
+      <h1 class="text-3xl font-black" style="letter-spacing:-.02em">Squidly</h1>
+      <p class="text-sm text-white/40 mt-0.5">Your deep-sea knowledge assistant 🦑</p>
+    </div>
+
+    <!-- Squid -->
+    <div class="squid-float cursor-pointer select-none fu2" id="squidEl" title="Click me!">
+      <svg width="150" height="175" viewBox="0 0 160 185" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M28 82C28 40 50 18 80 18C110 18 132 40 132 82V122H28V82Z" fill="url(#sqBody)"/>
+        <path d="M80 8L108 34H52L80 8Z" fill="#1a6b8a"/>
+        <ellipse cx="66" cy="52" rx="10" ry="18" fill="white" fill-opacity="0.1" transform="rotate(-18 66 52)"/>
+        <g class="squid-eye"><circle cx="54" cy="88" r="14" fill="white"/><circle cx="54" cy="88" r="7" fill="#0f2a38"/><circle cx="57" cy="85" r="2.5" fill="white"/></g>
+        <g class="squid-eye"><circle cx="106" cy="88" r="14" fill="white"/><circle cx="106" cy="88" r="7" fill="#0f2a38"/><circle cx="109" cy="85" r="2.5" fill="white"/></g>
+        <path d="M68 108 Q80 116 92 108" stroke="#1a6b8a" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+        <rect class="tent" x="32" y="122" width="13" height="32" rx="6.5" fill="#2d9cbe"/>
+        <rect class="tent" x="52" y="124" width="13" height="38" rx="6.5" fill="#1a6b8a"/>
+        <rect class="tent" x="73" y="125" width="13" height="40" rx="6.5" fill="#1a6b8a"/>
+        <rect class="tent" x="95" y="124" width="13" height="38" rx="6.5" fill="#1a6b8a"/>
+        <rect class="tent" x="115" y="122" width="13" height="32" rx="6.5" fill="#2d9cbe"/>
+        <ellipse cx="80" cy="122" rx="52" ry="7" fill="#062030" fill-opacity="0.3"/>
+        <defs>
+          <linearGradient id="sqBody" x1="80" y1="18" x2="80" y2="122" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stop-color="#3dd9a4"/><stop offset="50%" stop-color="#2d9cbe"/><stop offset="100%" stop-color="#1a6b8a"/>
+          </linearGradient>
+        </defs>
+      </svg>
+    </div>
+
+    <!-- Chat bubble -->
+    <div class="w-full fu3">
+      <div class="chat-bubble p-5" id="chatBubble">
+        <div class="md text-sm leading-relaxed" id="responseArea">
+          <p>Hey there! 🌊 I'm Squidly. Ask me anything and I'll dive deep to find your answer!</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Loading -->
+    <div id="loadingEl" class="hidden flex items-center gap-2">
+      <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+      <span class="text-white/50 text-xs font-semibold" style="font-family:Nunito">Sifting through the seafloor…</span>
+    </div>
+
+    <!-- Input -->
+    <div class="w-full input-wrap flex items-center px-3 py-2 gap-2 fu3">
+      <input id="userInput" type="text" maxlength="600" class="flex-1 px-3 py-2.5" placeholder="Ink your thoughts here…"/>
+      <button id="sendBtn" class="send-btn text-white px-5 py-2.5 flex items-center gap-2 text-sm">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+          <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z"/>
+        </svg>
+        Send
+      </button>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  // Background effects
+  (function(){
+    const s=document.getElementById('stars');
+    for(let i=0;i<60;i++){
+      const el=document.createElement('div'); el.className='star';
+      const sz=.5+Math.random()*1.5;
+      el.style.cssText=`width:${sz}px;height:${sz}px;left:${Math.random()*100}%;top:${Math.random()*45}%;animation-duration:${2+Math.random()*4}s;animation-delay:${Math.random()*5}s`;
+      s.appendChild(el);
+    }
+    const b=document.getElementById('bubbleWrap');
+    for(let i=0;i<20;i++){
+      const el=document.createElement('div'); el.className='bub';
+      const sz=8+Math.random()*36;
+      el.style.cssText=`width:${sz}px;height:${sz}px;left:${Math.random()*100}%;animation-duration:${12+Math.random()*20}s;animation-delay:${Math.random()*15}s`;
+      b.appendChild(el);
+    }
+  })();
+
+  // Squid
+  const squidEl = document.getElementById('squidEl');
+  const quips = ["Squishtastic! 🦑","You're kraken me up!","Just keep swimming!","I'm hooked on helping!","Shell yeah! 🐚","Ink-redible question incoming!"];
+  squidEl.addEventListener('click', () => showResponse(quips[Math.floor(Math.random()*quips.length)]));
+
+  function popSquid() {
+    squidEl.classList.remove('thinking','popping');
+    void squidEl.offsetWidth;
+    squidEl.classList.add('popping');
+    setTimeout(()=>squidEl.classList.remove('popping'),600);
+  }
+
+  // UI
+  const responseArea = document.getElementById('responseArea');
+  const chatBubble   = document.getElementById('chatBubble');
+  const loadingEl    = document.getElementById('loadingEl');
+  const sendBtn      = document.getElementById('sendBtn');
+
+  function showResponse(text) {
+    loadingEl.classList.add('hidden');
+    chatBubble.style.opacity='1';
+    responseArea.innerHTML=`<div class="md text-sm leading-relaxed">${marked.parse(text,{breaks:true,gfm:true})}</div>`;
+    popSquid();
+  }
+
+  function setLoading(on) {
+    loadingEl.classList.toggle('hidden',!on);
+    chatBubble.style.opacity = on ? '0.35' : '1';
+    squidEl.classList.toggle('thinking', on);
+    sendBtn.disabled = on;
+  }
+
+  // API call — goes to Netlify serverless function, not directly to Anthropic
+  async function askSquidly(query) {
+    setLoading(true);
+    try {
+      const res = await fetch('/api/ask', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query })
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) throw new Error(data.error || `Server error ${res.status}`);
+      showResponse(data.reply);
+    } catch(err) {
+      showResponse(`🐙 **Something went wrong!** ${err.message}\n\nPlease try again in a moment.`);
+      setLoading(false);
+    }
+  }
+
+  function handleSend() {
+    const q = document.getElementById('userInput').value.trim();
+    if (!q) return;
+    document.getElementById('userInput').value = '';
+    askSquidly(q);
+  }
+
+  sendBtn.addEventListener('click', handleSend);
+  document.getElementById('userInput').addEventListener('keydown', e => {
+    if (e.key==='Enter' && !e.shiftKey) handleSend();
+  });
+</script>
+</body>
+</html>

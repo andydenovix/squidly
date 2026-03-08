@@ -1,0 +1,9 @@
+{
+  "name": "squidly",
+  "version": "1.0.0",
+  "type": "module",
+  "dependencies": {
+    "@netlify/blobs": "^8.1.0",
+    "node-fetch": "^3.3.2"
+  }
+}
