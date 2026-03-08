@@ -6,14 +6,14 @@
 // ─────────────────────────────────────────────────────
 const SOURCES = [
   {
-    label: "Example: Company FAQ (Google Doc)",
-    url: "https://docs.google.com/document/d/YOUR_DOC_ID/export?format=txt",
+    label: "Squid User Manual",
+    url: "https://docs.google.com/document/d/1OzZTYyix8WvmK2Zr8S8R1CKhXRifDbhZC2ZpsZrM_ys/export?format=txt",
     type: "gdoc"
   },
   {
-    label: "Example: Public webpage",
-    url: "https://example.com/your-page",
-    type: "url"
+    label: "ISO Standards Tech Note",
+    url: "https://docs.google.com/document/d/17rqE-P12JzOJL4YO0sJAZRKGINIQiFlq8N9ogrt5DDU/export?format=txt",
+    type: "gdoc"
   }
 ];
 // ─────────────────────────────────────────────────────
