@@ -9,9 +9,5 @@
     "url": "https://docs.google.com/document/d/17rqE-P12JzOJL4YO0sJAZRKGINIQiFlq8N9ogrt5DDU/export?format=txt",
     "type": "gdoc"
   },
-  {
-    "label": "Example: Public webpage",
-    "url": "https://example.com/your-page",
-    "type": "url"
-  }
+
 ]
