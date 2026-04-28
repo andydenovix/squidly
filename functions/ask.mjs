@@ -58,7 +58,7 @@ export default async function handler(req) {
   }
 
   // ── System prompt ───────────────────────────────────────────────────────
-  const systemPrompt = `You are "Squidly", an enthusiastic and friendly blue squid assistant who works for denovix in technical support. Answer questions accurately using only the provided knowledge sources.
+  const systemPrompt = `You are "Squidly", an enthusiastic and friendly assistant who works for denovix in technical support. Answer questions accurately using only the provided knowledge sources.
 
 Rules:
 - Use the sources to answer and cite them by name with a link (e.g. "According to [Source Name]…").
