@@ -1,63 +1,62 @@
 // netlify/functions/scrape.mjs
-// Scrapes curated DeNovix pages nightly at 2am UTC.
-// ─────────────────────────────────────────────────
+// Scrapes Squid pipette knowledge sources nightly at 2am UTC.
+// Trigger manually: https://your-site.netlify.app/.netlify/functions/scrape
 
 import { getStore } from "@netlify/blobs";
 
-const CACHE_KEY = "gern_knowledge_cache";
+const CACHE_KEY = "squidly_knowledge_cache";
 const MAX_CHARS = 12000;
-const FETCH_TIMEOUT = 12000;
 
+// ── Sources ───────────────────────────────────────────────────────────────────
 const SOURCES = [
-  { label: "DeNovix Homepage",                      url: "https://www.denovix.com" },
-  { label: "DS-Series Product Range",               url: "https://www.denovix.com/products/ds-series/" },
-  { label: "DS-11 Series Spectrophotometer",        url: "https://www.denovix.com/products/ds-11-fx-spectrophotometer-fluorometer/" },
-  { label: "DS-8X Eight Channel Spectrophotometer", url: "https://www.denovix.com/products/ds-8x-eight-channel-spectrophotometer/" },
-  { label: "DS-7 Spectrophotometer",                url: "https://www.denovix.com/products/ds-7-spectrophotometer/" },
-  { label: "Helium Spectrophotometer",              url: "https://www.denovix.com/products/helium-spectrophotometer/" },
-  { label: "DS-C Cuvette Spectrophotometer",        url: "https://www.denovix.com/products/ds-c-cuvette-spectrophotometer/" },
-  { label: "QFX Fluorometer",                       url: "https://www.denovix.com/products/qfx-fluorometer/" },
-  { label: "CellDrop Automated Cell Counter",       url: "https://www.denovix.com/products/celldrop/" },
-  { label: "Fluorescence Quantification Assays",    url: "https://www.denovix.com/products/assays/" },
-  { label: "CellDrop Viability Assays",             url: "https://www.denovix.com/products/celldrop-assays/" },
-  { label: "DS-11 Series Technical Notes",          url: "https://www.denovix.com/products/technical-notes/" },
-  { label: "CellDrop Technical Notes",              url: "https://www.denovix.com/products/celldrop/celldrop-technical-notes/" },
-  { label: "QFX Technical Notes",                   url: "https://www.denovix.com/products/qfx-technical-notes/" },
-  { label: "eBooks and Infographics",               url: "https://www.denovix.com/ebooks/" },
-  { label: "Publication Resources",                 url: "https://www.denovix.com/publication-resources/" },
-  { label: "Quick Start Video Guides",              url: "https://www.denovix.com/products/quick-start-video-guides/" },
-  { label: "CellDrop Videos",                       url: "https://www.denovix.com/products/celldrop-videos/" },
-  { label: "DS-Series Videos",                      url: "https://www.denovix.com/products/videos/" },
-  { label: "QFX Videos",                            url: "https://www.denovix.com/products/qfx-videos/" },
-  { label: "Webinars",                              url: "https://www.denovix.com/webinars/" },
-  { label: "About DeNovix",                         url: "https://www.denovix.com/about-us/" },
-  { label: "Special Offers",                        url: "https://www.denovix.com/special-offers/" },
-  { label: "Squid Pipette Product Page",             url: "https://www.denovix.com/products/squid/" },
-  { label: "Squid Pipette Specifications",           url: "https://www.denovix.com/squid-specifications/" },
-  { label: "Squid Pipette User Guide (PDF)",         url: "https://www.denovix.com/pdf/denovix-squid-pipette-user-guide.pdf", type: "pdf" },
-  { label: "TN-249 Squid Pipette Validation",        url: "https://www.denovix.com/tn-249-performance-validation-of-squid-pipette" },
+  {
+    label: "Squid Pipette Product Page",
+    url: "https://www.denovix.com/products/squid/",
+    type: "url",
+  },
+  {
+    label: "TN-249 Performance Validation of Squid Pipette",
+    url: "https://www.denovix.com/tn-249-performance-validation-of-squid-pipette",
+    type: "url",
+  },
+  {
+    label: "Squid Resources",
+    url: "https://www.denovix.com/squid-resources",
+    type: "url",
+  },
+  {
+    label: "Squid Pipette User Guide",
+    url: "https://docs.google.com/document/d/1OwbSK-ZIeO99K7Gd-m-VXzvoB_s0gjuQarQAV6WkyYI/export?format=txt",
+    type: "gdoc",
+  },
+  {
+    label: "Squid Pipette Specifications",
+    url: "https://www.denovix.com/squid-specifications/",
+    type: "url",
+  },
+  {
+    label: "Squid Pipette Shop Page",
+    url: "https://shop.denovix.com/products/squid-full-range-electronic-pipette-1-1000ul",
+    type: "url",
+  },
+  {
+    label: "DeNovix Special Offers",
+    url: "https://www.denovix.com/special-offers/",
+    type: "url",
+  },
 ];
 
+// ── HTML → text ───────────────────────────────────────────────────────────────
 function extractVideoUrls(html) {
   const videos = [];
-  const patterns = [
-    /src=["'][^"']*youtube\.com\/embed\/([a-zA-Z0-9_-]{11})[^"']*/gi,
-    /href=["']https?:\/\/(?:www\.)?youtube\.com\/watch\?v=([a-zA-Z0-9_-]{11})[^"']*/gi,
-    /href=["']https?:\/\/youtu\.be\/([a-zA-Z0-9_-]{11})[^"']*/gi,
-  ];
-  for (const re of patterns) {
-    let m;
-    while ((m = re.exec(html)) !== null) videos.push(`https://www.youtube.com/watch?v=${m[1]}`);
-  }
+  const ytRe = /src=["'][^"']*(?:youtube\.com\/embed\/|youtu\.be\/)([a-zA-Z0-9_-]{11})[^"']*/gi;
   const vimRe = /src=["'][^"']*vimeo\.com\/(?:video\/)?([0-9]+)[^"']*/gi;
+  const ytLinkRe = /href=["']https?:\/\/(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})[^"']*/gi;
   let m;
-  while ((m = vimRe.exec(html)) !== null) videos.push(`https://vimeo.com/${m[1]}`);
+  while ((m = ytRe.exec(html))    !== null) videos.push(`https://www.youtube.com/watch?v=${m[1]}`);
+  while ((m = vimRe.exec(html))   !== null) videos.push(`https://vimeo.com/${m[1]}`);
+  while ((m = ytLinkRe.exec(html)) !== null) videos.push(`https://www.youtube.com/watch?v=${m[1]}`);
   return [...new Set(videos)];
-}
-
-function extractTitle(html) {
-  const m = html.match(/<title>([^<]+)<\/title>/i);
-  return m ? m[1].replace(/\s*[|\-]\s*DeNovix.*$/i, "").trim() : null;
 }
 
 function stripHtml(html) {
@@ -70,55 +69,101 @@ function stripHtml(html) {
     .replace(/<header[\s\S]*?<\/header>/gi, "")
     .replace(/<!--[\s\S]*?-->/g, "")
     .replace(/<[^>]+>/g, " ")
-    .replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#8[01]7;/g, "'")
-    .replace(/\s{3,}/g, "\n\n").trim();
-  if (videoUrls.length > 0)
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#8[01]7;/g, "'")
+    .replace(/\s{3,}/g, "\n\n")
+    .trim();
+  if (videoUrls.length > 0) {
     text += "\n\nVIDEOS ON THIS PAGE:\n" + videoUrls.map(u => `- ${u}`).join("\n");
+  }
   return text;
 }
 
-async function scrapeSource({ label, url }) {
+function extractTitle(html) {
+  const m = html.match(/<title>([^<]+)<\/title>/i);
+  if (!m) return null;
+  return m[1].replace(/\s*[|\-–]\s*DeNovix.*$/i, "").trim();
+}
+
+// ── Scrape a single source ─────────────────────────────────────────────────────
+async function scrapeSource(source) {
+  const { label, url, type } = source;
   try {
     const res = await fetch(url, {
-      headers: { "User-Agent": "AskGern-Bot/1.0 (DeNovix Knowledge Assistant)" },
-      signal: AbortSignal.timeout(FETCH_TIMEOUT),
+      headers: { "User-Agent": "Squidly-Bot/1.0 (DeNovix Knowledge Assistant)" },
+      signal: AbortSignal.timeout(20000),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const html = await res.text();
-    const pageTitle = extractTitle(html) || label;
-    const text = stripHtml(html).slice(0, MAX_CHARS);
-    if (!text || text.length < 80) throw new Error("Insufficient content");
-    return { label: pageTitle, url, status: "ready", content: text, scrapedAt: new Date().toISOString() };
+
+    let text = "";
+    if (type === "pdf") {
+      text = `[PDF Document: ${label}]\nURL: ${url}\nThis is a PDF — direct users to download it at the link above for full content.`;
+    } else {
+      const html = await res.text();
+      const title = extractTitle(html) || label;
+      text = stripHtml(html);
+      if (!text || text.length < 80) throw new Error("Insufficient content extracted");
+    }
+
+    return {
+      label,
+      url,
+      type,
+      status: "ready",
+      content: text.slice(0, MAX_CHARS),
+      scrapedAt: new Date().toISOString(),
+    };
   } catch (err) {
     console.error(`[scrape] Failed: ${label} — ${err.message}`);
-    return { label, url, status: "error", error: err.message };
+    return {
+      label,
+      url,
+      type,
+      status: "error",
+      error: err.message,
+      scrapedAt: new Date().toISOString(),
+    };
   }
 }
 
+// ── Main handler ──────────────────────────────────────────────────────────────
 export default async function handler() {
-  console.log(`[scrape] Starting — ${SOURCES.length} sources`);
-  const results = [];
-  const BATCH = 4;
-  for (let i = 0; i < SOURCES.length; i += BATCH) {
-    const batch = SOURCES.slice(i, i + BATCH);
-    const settled = await Promise.allSettled(batch.map(scrapeSource));
-    results.push(...settled.map(r => r.status === "fulfilled" ? r.value : { status: "error", error: r.reason?.message }));
-    if (i + BATCH < SOURCES.length) await new Promise(r => setTimeout(r, 250));
-  }
+  console.log(`[scrape] Starting scrape of ${SOURCES.length} Squid pipette sources…`);
 
-  const ready = results.filter(s => s.status === "ready").length;
-  console.log(`[scrape] Done: ${ready}/${SOURCES.length} ready`);
+  const results = await Promise.allSettled(SOURCES.map(scrapeSource));
+  const scraped = results.map(r =>
+    r.status === "fulfilled" ? r.value : { status: "error", error: r.reason?.message }
+  );
 
-  const store = getStore("gern");
+  const ready = scraped.filter(s => s.status === "ready").length;
+  const errors = scraped.filter(s => s.status === "error").length;
+  console.log(`[scrape] Done. ${ready}/${SOURCES.length} ready, ${errors} errors.`);
+
+  const store = getStore("squidly");
   await store.setJSON(CACHE_KEY, {
-    sources: results.filter(s => s.status === "ready"),
+    sources: scraped,
     updatedAt: new Date().toISOString(),
-    stats: { ready, total: SOURCES.length },
+    stats: { ready, errors, total: SOURCES.length },
   });
 
   return new Response(
-    JSON.stringify({ ok: true, ready, total: SOURCES.length, sources: results.map(s => ({ label: s.label, status: s.status, error: s.error })) }),
+    JSON.stringify({
+      ok: true,
+      ready,
+      errors,
+      total: SOURCES.length,
+      sources: scraped.map(s => ({
+        label: s.label,
+        url: s.url,
+        status: s.status,
+        error: s.error,
+        chars: s.content?.length,
+      })),
+    }),
     { status: 200, headers: { "Content-Type": "application/json" } }
   );
 }
