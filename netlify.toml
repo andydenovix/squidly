@@ -1,11 +1,10 @@
 [build]
   publish = "."
-  functions = "netlify/functions"
 
 [functions]
+  directory = "netlify/functions"
   node_bundler = "esbuild"
 
-# Nightly scrape at 2am UTC to refresh cached knowledge
 [functions."scrape.mjs"]
   schedule = "0 2 * * *"
 
